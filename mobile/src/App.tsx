@@ -13,6 +13,8 @@ import PlaylistsPage from './pages/PlaylistsPage';
 
 const Stack = createStackNavigator();
 
+const BACKEND_URL = "http://localhost:8000"; // Update to match the new backend port
+
 function WebSocketComponent() {
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [messages, setMessages] = useState<string[]>([]);

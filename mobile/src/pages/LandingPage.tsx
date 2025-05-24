@@ -21,6 +21,7 @@ const LandingPage = () => {
           onPress={() => navigation.navigate('Playlists')}
           color="#6a0dad"
         />
+        
       </View>
     </View>
   );
