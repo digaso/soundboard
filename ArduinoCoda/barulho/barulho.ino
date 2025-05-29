@@ -8,42 +8,45 @@ char pass[] = "12345678";
 WiFiServer server(80);
 
 int buzzerPin = 9;
-int ledPinVerde = 10;
-int ledPinVermelho = 11;
-int botoes[5] = { 2, 3, 4, 5, 6 };
-int frequencias[5] = { 262, 294, 330, 349, 392 };
+int botoes[ 5 ] = { 2, 3, 4, 5, 6 };
+int frequencias[ 5 ] = { 262, 294, 330, 349, 392 };
 
 String musicaGravada = "";
 bool modoGravar = false;
+
+const int ledGravar = 10;
+const int ledToque = 11;
 
 void setup() {
   Serial.begin(115200);
   delay(1000);
 
-  // Criar Access Point
   Serial.println("A criar Access Point...");
   int status = WiFi.beginAP(ssid, pass);
   if (status != WL_AP_LISTENING) {
     Serial.println("Erro ao iniciar AP");
-    while (true)
-      ;  // trava aqui se falhar
+    while (true);
   }
 
-  delay(1000);  // Esperar o AP ficar ativo
+  delay(1000);
   IPAddress ip = WiFi.localIP();
   Serial.print("AP criado com IP: ");
   Serial.println(ip);
 
   server.begin();
-  pinMode(ledPinVermelho, OUTPUT);
-  pinMode(ledPinVerde, OUTPUT);  // Set LED pin as output
+
   pinMode(buzzerPin, OUTPUT);
   for (int i = 0; i < 5; i++) {
-    pinMode(botoes[i], INPUT_PULLUP);
+    pinMode(botoes[ i ], INPUT_PULLUP);
   }
 
   pinMode(7, INPUT_PULLUP);
   pinMode(8, INPUT_PULLUP);
+
+  pinMode(ledGravar, OUTPUT);
+  pinMode(ledToque, OUTPUT);
+  digitalWrite(ledGravar, LOW);
+  digitalWrite(ledToque, LOW);
 
   Serial.println("Modo atual: FREESTYLE");
 }
@@ -51,64 +54,56 @@ void setup() {
 void loop() {
   static int lastNote = -1;
   static unsigned long tempoInicio = 0;
-  static bool lastEstadoBotao7 = HIGH;
-  
+  static bool lastEstadoBotao7 = LOW;
+
   bool estadoAtualBotao7 = digitalRead(7);
-  
-  // Detect button press (falling edge)
   if (lastEstadoBotao7 == HIGH && estadoAtualBotao7 == LOW) {
     modoGravar = !modoGravar;
-    
-    if (modoGravar) {
-      // Starting recording mode
-      musicaGravada = "";
-      digitalWrite(ledPinVermelho, HIGH);  // Turn on red LED
-      Serial.println("Modo GRAVAR ativado");
-    } else {
-      // Stopping recording mode
-      digitalWrite(ledPinVermelho, LOW);   // Turn off red LED
+
+    if (!modoGravar) {
       Serial.println("A guardar música na EEPROM...");
+
+      // Piscar LED enquanto guarda
+      for (int i = 0; i < 6; i++) {
+        digitalWrite(ledGravar, i % 2 == 0 ? HIGH : LOW);
+        delay(100);
+      }
       salvarMusicaNaEEPROM(musicaGravada);
+      digitalWrite(ledGravar, LOW);
       Serial.println("Guardado com sucesso.");
       Serial.println("FreeStyle ativado");
+    }
+    else {
+      musicaGravada = "";
+      Serial.println("Modo GRAVAR ativado");
+      digitalWrite(ledGravar, HIGH);  // Ligar LED em modo gravar
     }
     delay(300);
   }
   lastEstadoBotao7 = estadoAtualBotao7;
 
-  // Keep red LED on while in recording mode
-  if (modoGravar) {
-    digitalWrite(ledPinVermelho, HIGH);
-  } else {
-    digitalWrite(ledPinVermelho, LOW);
-  }
-
-  // Check for button presses
   for (int i = 0; i < 5; i++) {
-    if (digitalRead(botoes[i]) == LOW) {
-      digitalWrite(ledPinVerde, HIGH);  // Turn on green LED
+    if (digitalRead(botoes[ i ]) == LOW) {
       if (lastNote != i) {
-        tone(buzzerPin, frequencias[i]);
+        tone(buzzerPin, frequencias[ i ]);
         tempoInicio = millis();
         lastNote = i;
+        digitalWrite(ledToque, HIGH);  // LED toca
         delay(10);
       }
       return;
     }
   }
 
-  // If no button is pressed, turn off green LED
-  digitalWrite(ledPinVerde, LOW);
-
   if (lastNote != -1) {
     noTone(buzzerPin);
+    digitalWrite(ledToque, LOW);  // Desligar LED ao soltar
     unsigned long duracao = millis() - tempoInicio;
 
     if (modoGravar) {
-      String linha = String(frequencias[lastNote]) + "," + String(duracao) + "\n";
+      String linha = String(frequencias[ lastNote ]) + "," + String(duracao) + "\n";
       musicaGravada += linha;
-      Serial.print("Gravado: ");
-      Serial.print(linha);
+      Serial.print("Gravado: "); Serial.print(linha);
     }
 
     lastNote = -1;
@@ -121,14 +116,14 @@ void loop() {
     delay(2000);
   }
 
-  // HTTP Server
+  // Servidor HTTP
   WiFiClient client = server.available();
   if (client) {
     Serial.println("Novo cliente conectado");
     while (client.connected()) {
       if (client.available()) {
         String req = client.readStringUntil('\r');
-        client.read();  // lê o '\n'
+        client.read();
 
         if (req.indexOf("GET /musica") != -1) {
           String resposta = lerMusicaDaEEPROM();
@@ -139,7 +134,8 @@ void loop() {
           client.println(resposta.length());
           client.println();
           client.print(resposta);
-        } else {
+        }
+        else {
           client.println("HTTP/1.1 200 OK");
           client.println("Content-Type: text/plain");
           client.println();
@@ -156,12 +152,21 @@ void loop() {
 
 void salvarMusicaNaEEPROM(String musica) {
   int len = musica.length();
-  for (int i = 0; i < len && i < EEPROM.length(); i++) {
-    EEPROM.write(i, musica[i]);
-  }
-  EEPROM.write(len, '\0');
-}
+  bool estadoLed = false;
 
+  for (int i = 0; i < len && i < EEPROM.length(); i++) {
+    EEPROM.write(i, musica[ i ]);
+
+    // Piscar LED durante escrita
+    estadoLed = !estadoLed;
+    digitalWrite(ledGravar, estadoLed);
+    delay(50);  // Piscar rápido mas visível
+  }
+
+  EEPROM.write(len, '\0');  // Terminador nulo
+
+  digitalWrite(ledGravar, LOW); // Apaga LED no final
+}
 String lerMusicaDaEEPROM() {
   String lida = "";
   char c;
