@@ -3,13 +3,15 @@
 #include <WiFiServer.h>
 
 char ssid[] = "ArduinoPiano";
-char pass[] = "12345678";  // Tem de ter no mínimo 8 caracteres
+char pass[] = "12345678";
 
 WiFiServer server(80);
 
 int buzzerPin = 9;
-int botoes[5] = {2, 3, 4, 5, 6};
-int frequencias[5] = {262, 294, 330, 349, 392};
+int ledPinVerde = 10;
+int ledPinVermelho = 11;
+int botoes[5] = { 2, 3, 4, 5, 6 };
+int frequencias[5] = { 262, 294, 330, 349, 392 };
 
 String musicaGravada = "";
 bool modoGravar = false;
@@ -23,7 +25,8 @@ void setup() {
   int status = WiFi.beginAP(ssid, pass);
   if (status != WL_AP_LISTENING) {
     Serial.println("Erro ao iniciar AP");
-    while (true); // trava aqui se falhar
+    while (true)
+      ;  // trava aqui se falhar
   }
 
   delay(1000);  // Esperar o AP ficar ativo
@@ -32,7 +35,8 @@ void setup() {
   Serial.println(ip);
 
   server.begin();
-
+  pinMode(ledPinVermelho, OUTPUT);
+  pinMode(ledPinVerde, OUTPUT);  // Set LED pin as output
   pinMode(buzzerPin, OUTPUT);
   for (int i = 0; i < 5; i++) {
     pinMode(botoes[i], INPUT_PULLUP);
@@ -48,26 +52,41 @@ void loop() {
   static int lastNote = -1;
   static unsigned long tempoInicio = 0;
   static bool lastEstadoBotao7 = HIGH;
-
+  
   bool estadoAtualBotao7 = digitalRead(7);
+  
+  // Detect button press (falling edge)
   if (lastEstadoBotao7 == HIGH && estadoAtualBotao7 == LOW) {
     modoGravar = !modoGravar;
-
-    if (!modoGravar) {
+    
+    if (modoGravar) {
+      // Starting recording mode
+      musicaGravada = "";
+      digitalWrite(ledPinVermelho, HIGH);  // Turn on red LED
+      Serial.println("Modo GRAVAR ativado");
+    } else {
+      // Stopping recording mode
+      digitalWrite(ledPinVermelho, LOW);   // Turn off red LED
       Serial.println("A guardar música na EEPROM...");
       salvarMusicaNaEEPROM(musicaGravada);
       Serial.println("Guardado com sucesso.");
       Serial.println("FreeStyle ativado");
-    } else {
-      musicaGravada = "";
-      Serial.println("Modo GRAVAR ativado");
     }
     delay(300);
   }
   lastEstadoBotao7 = estadoAtualBotao7;
 
+  // Keep red LED on while in recording mode
+  if (modoGravar) {
+    digitalWrite(ledPinVermelho, HIGH);
+  } else {
+    digitalWrite(ledPinVermelho, LOW);
+  }
+
+  // Check for button presses
   for (int i = 0; i < 5; i++) {
     if (digitalRead(botoes[i]) == LOW) {
+      digitalWrite(ledPinVerde, HIGH);  // Turn on green LED
       if (lastNote != i) {
         tone(buzzerPin, frequencias[i]);
         tempoInicio = millis();
@@ -78,6 +97,9 @@ void loop() {
     }
   }
 
+  // If no button is pressed, turn off green LED
+  digitalWrite(ledPinVerde, LOW);
+
   if (lastNote != -1) {
     noTone(buzzerPin);
     unsigned long duracao = millis() - tempoInicio;
@@ -85,7 +107,8 @@ void loop() {
     if (modoGravar) {
       String linha = String(frequencias[lastNote]) + "," + String(duracao) + "\n";
       musicaGravada += linha;
-      Serial.print("Gravado: "); Serial.print(linha);
+      Serial.print("Gravado: ");
+      Serial.print(linha);
     }
 
     lastNote = -1;
@@ -98,14 +121,14 @@ void loop() {
     delay(2000);
   }
 
-  // Servidor HTTP
+  // HTTP Server
   WiFiClient client = server.available();
   if (client) {
     Serial.println("Novo cliente conectado");
     while (client.connected()) {
       if (client.available()) {
         String req = client.readStringUntil('\r');
-        client.read(); // lê o '\n'
+        client.read();  // lê o '\n'
 
         if (req.indexOf("GET /musica") != -1) {
           String resposta = lerMusicaDaEEPROM();
