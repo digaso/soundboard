@@ -71,6 +71,7 @@ const Song = () => {
   const [nomeMusica, setNomeMusica] = useState("");
   const [wavTempPath, setWavTempPath] = useState(null);
   const [mostraGuardar, setMostraGuardar] = useState(false);
+  const [estaTocar, setEstaTocar] = useState(false);
   const soundRef = useRef(null);
   const navigation = useNavigation();
 
@@ -95,7 +96,6 @@ const Song = () => {
       });
 
       const texto = response.data;
-      console.log("Texto recebido:", texto);
 
       if (!texto) {
         Alert.alert("Erro", "Nenhum dado recebido do Arduino.");
@@ -134,15 +134,18 @@ const Song = () => {
 
       const { sound } = await Audio.Sound.createAsync(
         { uri: caminhoTemp },
-        { shouldPlay: true }
+        {
+          shouldPlay: true,
+          isLooping: false,
+        }
       );
 
       soundRef.current = sound;
       setWavTempPath(caminhoTemp);
       setMostraGuardar(true);
+      setEstaTocar(true);
       setStatus("Música recebida 🎵");
     } catch (error) {
-      console.error("Erro ao buscar música:", error.message);
       Alert.alert("Erro", "Não foi possível obter a música do Arduino.");
       setStatus("Erro");
     } finally {
@@ -170,7 +173,6 @@ const Song = () => {
       setNomeMusica("");
       setMostraGuardar(false);
     } catch (error) {
-      console.error("Erro ao guardar:", error.message);
       Alert.alert("Erro", "Não foi possível guardar a música.");
     }
   }
@@ -181,9 +183,11 @@ const Song = () => {
       if (status.isPlaying) {
         await soundRef.current.pauseAsync();
         setStatus("Pausado");
+        setEstaTocar(false);
       } else {
         await soundRef.current.playAsync();
         setStatus("A tocar...");
+        setEstaTocar(true);
       }
     }
   }
@@ -192,21 +196,16 @@ const Song = () => {
     if (soundRef.current) {
       await soundRef.current.stopAsync();
       setStatus("Parado");
+      setEstaTocar(false);
     }
   }
 
   return (
     <View style={styles.container}>
-      {/* Botão voltar */}
       <TouchableOpacity
         style={styles.botaoVoltar}
         onPress={() => navigation.goBack()}
-        hitSlop={{
-          top: 10,
-          bottom: 10,
-          left: 10,
-          right: 10,
-        }}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         <Ionicons name="arrow-back" size={28} color="#6a0dad" />
       </TouchableOpacity>
@@ -239,8 +238,14 @@ const Song = () => {
           )}
 
           <TouchableOpacity style={styles.botao} onPress={pausarOuRetomar}>
-            <Ionicons name="play-skip-forward-outline" size={24} color="#fff" />
-            <Text style={styles.textoBotao}> Pausar/Retomar</Text>
+            <Ionicons
+              name={estaTocar ? "pause-outline" : "play-outline"}
+              size={24}
+              color="#fff"
+            />
+            <Text style={styles.textoBotao}>
+              {estaTocar ? "Pausar" : "Retomar"}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -265,18 +270,9 @@ const styles = StyleSheet.create({
   },
   botaoVoltar: {
     position: "absolute",
-    top: 60,
+    top: 50,
     left: 10,
-    padding: 10,
-
-    marginBottom: 15,
-  },
-  titulo: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#1DB954",
-    marginBottom: 12,
-    textAlign: "center",
+    zIndex: 1,
   },
   estado: {
     color: "#fff",
