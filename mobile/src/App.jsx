@@ -6,20 +6,30 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import LandingPage from './frontend/LandingPage';
-import PlaylistsPage from './frontend/PlaylistsPage';
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
+import LandingPage from "./frontend/LandingPage";
+import PlaylistsPage from "./frontend/PlaylistsPage";
+import Song from "./frontend/Song";
 
 const Stack = createStackNavigator();
 
-
 export default function App() {
+  console.log(Song);
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Landing">
-        <Stack.Screen name="Landing" component={LandingPage} options={{ headerShown: false }} />
+        <Stack.Screen
+          name="Landing"
+          component={LandingPage}
+          options={{ headerShown: false }}
+        />
         <Stack.Screen name="Playlists" component={PlaylistsPage} />
+        <Stack.Screen
+          name="Song"
+          component={Song}
+          options={{ title: "Song Details" }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
