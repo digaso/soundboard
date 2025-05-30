@@ -1,19 +1,21 @@
-// App.jsx
 import React, { useState, useRef } from "react";
 import {
   View,
   Text,
-  Button,
   StyleSheet,
   ActivityIndicator,
   Alert,
+  TextInput,
+  TouchableOpacity,
+  Platform,
 } from "react-native";
 import { Buffer } from "buffer";
 import * as FileSystem from "expo-file-system";
 import { Audio } from "expo-av";
 import axios from "axios";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 
-// Gerar tom senoidal
 function gerarTom(freq, durMs, sampleRate = 44100) {
   const nSamples = Math.floor((durMs / 1000) * sampleRate);
   const buffer = new Int16Array(nSamples);
@@ -24,7 +26,6 @@ function gerarTom(freq, durMs, sampleRate = 44100) {
   return buffer;
 }
 
-// Construir WAV
 function gerarWAV(data, sampleRate = 44100) {
   const header = new ArrayBuffer(44);
   const view = new DataView(header);
@@ -67,10 +68,13 @@ function gerarWAV(data, sampleRate = 44100) {
 const Song = () => {
   const [status, setStatus] = useState("Parado");
   const [loading, setLoading] = useState(false);
+  const [nomeMusica, setNomeMusica] = useState("");
+  const [wavTempPath, setWavTempPath] = useState(null);
+  const [mostraGuardar, setMostraGuardar] = useState(false);
   const soundRef = useRef(null);
+  const navigation = useNavigation();
 
-  async function tocarMusicaDoArduino() {
-    console.log("A tocar música do Arduino...");
+  async function receberMusica() {
     try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
@@ -80,13 +84,14 @@ const Song = () => {
         interruptionModeAndroid: 1,
         playThroughEarpieceAndroid: false,
       });
+
       setLoading(true);
       setStatus("A buscar música...");
 
       const response = await axios.get("http://192.168.4.1/musica", {
         timeout: 3000,
-        responseType: "text", // Força a resposta como texto
-        transformResponse: [(data) => data], // Evita que axios tente converter JSON
+        responseType: "text",
+        transformResponse: [(data) => data],
       });
 
       const texto = response.data;
@@ -116,30 +121,57 @@ const Song = () => {
       const wav = gerarWAV(pcm, sampleRate);
 
       const base64Wav = Buffer.from(wav.buffer).toString("base64");
-      const caminho = FileSystem.documentDirectory + "musica.wav";
-      await FileSystem.writeAsStringAsync(caminho, base64Wav, {
+      const caminhoTemp = FileSystem.documentDirectory + "temp.wav";
+
+      await FileSystem.writeAsStringAsync(caminhoTemp, base64Wav, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Se já houver som carregado, descarrega
       if (soundRef.current) {
         await soundRef.current.unloadAsync();
         soundRef.current = null;
       }
 
       const { sound } = await Audio.Sound.createAsync(
-        { uri: caminho },
+        { uri: caminhoTemp },
         { shouldPlay: true }
       );
 
       soundRef.current = sound;
-      setStatus("A tocar...");
+      setWavTempPath(caminhoTemp);
+      setMostraGuardar(true);
+      setStatus("Música recebida 🎵");
     } catch (error) {
       console.error("Erro ao buscar música:", error.message);
       Alert.alert("Erro", "Não foi possível obter a música do Arduino.");
       setStatus("Erro");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function guardarMusica() {
+    if (!nomeMusica.trim()) {
+      Alert.alert("Erro", "Escolhe um nome válido para guardar.");
+      return;
+    }
+
+    const caminhoFinal =
+      FileSystem.documentDirectory + nomeMusica.trim() + ".wav";
+
+    try {
+      await FileSystem.copyAsync({
+        from: wavTempPath,
+        to: caminhoFinal,
+      });
+
+      Alert.alert("Guardado", `Música guardada como ${nomeMusica}.wav`);
+      setStatus("Guardada");
+      setNomeMusica("");
+      setMostraGuardar(false);
+    } catch (error) {
+      console.error("Erro ao guardar:", error.message);
+      Alert.alert("Erro", "Não foi possível guardar a música.");
     }
   }
 
@@ -165,18 +197,59 @@ const Song = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.titulo}>🎹 Arduino Piano</Text>
+      {/* Botão voltar */}
+      <TouchableOpacity
+        style={styles.botaoVoltar}
+        onPress={() => navigation.goBack()}
+        hitSlop={{
+          top: 10,
+          bottom: 10,
+          left: 10,
+          right: 10,
+        }}
+      >
+        <Ionicons name="arrow-back" size={28} color="#6a0dad" />
+      </TouchableOpacity>
+
       <Text style={styles.estado}>Estado: {status}</Text>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#007aff" />
+        <ActivityIndicator size="large" color="#1DB954" />
       ) : (
         <>
-          <Button title="🎵 Tocar Música" onPress={tocarMusicaDoArduino} />
-          <View style={styles.espaco} />
-          <Button title="⏯️ Pausar/Retomar" onPress={pausarOuRetomar} />
-          <View style={styles.espaco} />
-          <Button title="⏹️ Parar" onPress={pararSom} color="red" />
+          <TouchableOpacity style={styles.botao} onPress={receberMusica}>
+            <Ionicons name="download-outline" size={24} color="#fff" />
+            <Text style={styles.textoBotao}> Receber Música</Text>
+          </TouchableOpacity>
+
+          {mostraGuardar && (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Nome da música"
+                placeholderTextColor="#888"
+                value={nomeMusica}
+                onChangeText={setNomeMusica}
+              />
+              <TouchableOpacity style={styles.botao} onPress={guardarMusica}>
+                <Ionicons name="save-outline" size={24} color="#fff" />
+                <Text style={styles.textoBotao}> Guardar Música</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          <TouchableOpacity style={styles.botao} onPress={pausarOuRetomar}>
+            <Ionicons name="play-skip-forward-outline" size={24} color="#fff" />
+            <Text style={styles.textoBotao}> Pausar/Retomar</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.botao, { backgroundColor: "#E0245E" }]}
+            onPress={pararSom}
+          >
+            <Ionicons name="stop-outline" size={24} color="#fff" />
+            <Text style={styles.textoBotao}> Parar</Text>
+          </TouchableOpacity>
         </>
       )}
     </View>
@@ -186,23 +259,54 @@ const Song = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fafafa",
-    alignItems: "center",
+    backgroundColor: "#121212",
     justifyContent: "center",
     padding: 20,
+  },
+  botaoVoltar: {
+    position: "absolute",
+    top: 60,
+    left: 10,
+    padding: 10,
+
+    marginBottom: 15,
   },
   titulo: {
     fontSize: 28,
     fontWeight: "bold",
-    marginBottom: 30,
+    color: "#1DB954",
+    marginBottom: 12,
+    textAlign: "center",
   },
   estado: {
-    fontSize: 18,
+    color: "#fff",
+    fontSize: 16,
     marginBottom: 20,
-    color: "#555",
+    textAlign: "center",
   },
-  espaco: {
-    height: 15,
+  botao: {
+    flexDirection: "row",
+    backgroundColor: "#6a0dad",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginVertical: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  textoBotao: {
+    color: "#fff",
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  input: {
+    backgroundColor: "#333",
+    color: "#fff",
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: Platform.OS === "ios" ? 15 : 10,
+    fontSize: 16,
+    marginVertical: 10,
   },
 });
 

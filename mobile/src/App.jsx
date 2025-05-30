@@ -9,8 +9,8 @@ import {
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import LandingPage from "./frontend/LandingPage";
-import PlaylistsPage from "./frontend/PlaylistsPage";
 import Song from "./frontend/Song";
+import SongList from "./frontend/SongList";
 
 const Stack = createStackNavigator();
 
@@ -24,11 +24,15 @@ export default function App() {
           component={LandingPage}
           options={{ headerShown: false }}
         />
-        <Stack.Screen name="Playlists" component={PlaylistsPage} />
+        <Stack.Screen
+          name="SongList"
+          component={SongList}
+          options={{ headerShown: false }}
+        />
         <Stack.Screen
           name="Song"
           component={Song}
-          options={{ title: "Song Details" }}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>

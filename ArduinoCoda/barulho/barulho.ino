@@ -154,6 +154,8 @@ void salvarMusicaNaEEPROM(String musica) {
   int len = musica.length();
   bool estadoLed = false;
 
+  Serial.println(EEPROM.length());
+  int tempoInicial = millis();
   for (int i = 0; i < len && i < EEPROM.length(); i++) {
     EEPROM.write(i, musica[ i ]);
 
@@ -162,8 +164,9 @@ void salvarMusicaNaEEPROM(String musica) {
     digitalWrite(ledGravar, estadoLed);
     delay(50);  // Piscar rápido mas visível
   }
-
+  
   EEPROM.write(len, '\0');  // Terminador nulo
+  Serial.println(millis() - tempoInicial);
 
   digitalWrite(ledGravar, LOW); // Apaga LED no final
 }

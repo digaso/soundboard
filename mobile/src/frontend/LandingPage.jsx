@@ -12,12 +12,21 @@ const LandingPage = () => {
         <Text style={styles.subtitle}>Create and play your music</Text>
       </View>
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate("Song")}
-      >
-        <Text style={styles.buttonText}>Get Song from Arduino</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonsContainer}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate("Song")}
+        >
+          <Text style={styles.buttonText}>Get Song from Arduino</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: "#a64ac9" }]}
+          onPress={() => navigation.navigate("SongList")}
+        >
+          <Text style={styles.buttonText}>My Songs</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -25,7 +34,7 @@ const LandingPage = () => {
 const styles = {
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#121212",
     alignItems: "center",
     justifyContent: "space-between",
     padding: 20,
@@ -38,7 +47,7 @@ const styles = {
   logo: {
     fontSize: 48,
     fontWeight: "bold",
-    color: "#6a0dad",
+    color: "#a64ac9",
     marginBottom: 10,
     textShadowColor: "rgba(106, 13, 173, 0.3)",
     textShadowOffset: { width: 0, height: 2 },
@@ -49,13 +58,18 @@ const styles = {
     color: "#666",
     marginBottom: 40,
   },
+  buttonsContainer: {
+    width: "100%",
+    marginBottom: 40,
+    gap: 20,
+    alignItems: "center",
+  },
   button: {
     backgroundColor: "#6a0dad",
     paddingVertical: 20,
     paddingHorizontal: 40,
     borderRadius: 15,
     width: "80%",
-    marginBottom: 40,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
